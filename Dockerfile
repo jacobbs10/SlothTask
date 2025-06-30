@@ -10,7 +10,8 @@ WORKDIR /app
 # Copy everything into the container
 COPY . .
 
-# Install dependencies
+# Install dependencies (assumes package.json is in /server)
+WORKDIR /app/server
 RUN npm install
 
 # Make start script executable

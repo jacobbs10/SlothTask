@@ -1,5 +1,3 @@
-/hls
-
 *.ts
 
 hls/*.ts

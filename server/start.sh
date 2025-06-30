@@ -7,6 +7,7 @@ mkdir -p ./hls
 rm -f ./hls/*.ts ./hls/*.m3u8
 
 # Start FFmpeg in background and redirect output
+chmod +x ./ffmpeg-loop.sh
 ./ffmpeg-loop.sh &
 
 # Optionally wait for FFmpeg to initialize

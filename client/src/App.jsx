@@ -4,10 +4,11 @@ import Hls from 'hls.js';
 function App() {
   const videoRef = useRef(null);
   const [latency, setLatency] = useState(null);
+  const BASE_URL = process.env.REACT_APP_BASE_URL || "http://localhost:8000/hls/stream.m3u8";
 
   useEffect(() => {
     const video = videoRef.current;
-    const source = 'http://localhost:8000/hls/stream.m3u8';
+    const source = `${BASE_URL}`;
 
     if (Hls.isSupported()) {
       const hls = new Hls();

@@ -8,6 +8,7 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "ncc build src/index.js -o dist",
     "start": "node server.js"
   }
 }

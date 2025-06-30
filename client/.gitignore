@@ -21,3 +21,13 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+node_modules/*
+
+*.ts
+*.m3u8
+
+hls/*.ts
+hls/*.m3u8
+hls/**/*.ts
+hls/**/*.m3u8

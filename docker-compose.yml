@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  sloth-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server/video:/app/server/video
+      - ./server/hls:/app/server/hls
+
+  sloth-client:
+    build:
+      context: ./client
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app

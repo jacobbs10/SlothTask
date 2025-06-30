@@ -18,24 +18,15 @@ function App() {
         video.play();
       });
 
-      hls.on(Hls.Events.FRAG_PARSING_METADATA, (event, data) => {
+      hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+        const fragTime = new Date(data.frag.programDateTime);
         const now = new Date();
-
-        const tag = data.samples.find(sample => {
-          const decoded = new TextDecoder('utf-8').decode(sample.data);
-          return decoded.includes('EXT-X-PROGRAM-DATE-TIME');
-        });
-
-        if (tag) {
-          try {
-            const decoded = new TextDecoder('utf-8').decode(tag.data);
-            const timestamp = decoded.split(': ')[1];
-            const fragmentTime = new Date(timestamp);
-            const diff = (now - fragmentTime) / 1000;
-            setLatency(diff.toFixed(2));
-          } catch (err) {}
+        if (fragTime) {
+          const diff = (now - fragTime) / 1000;
+          setLatency(diff.toFixed(2));
         }
       });
+
     } else {
       video.src = source;
     }

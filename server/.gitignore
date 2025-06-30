@@ -1,0 +1,6 @@
+/hls
+
+*.ts
+
+hls/*.ts
+hls/**/*.ts

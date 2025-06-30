@@ -63,7 +63,7 @@ cd client
 npm install hls.js
 ```
 
-Replace `App.js` with the provided component that:
+React App:
 
 - Plays the HLS stream
 - Fetches server time every second and compares with `video.currentTime` to estimate latency
@@ -89,8 +89,8 @@ docker run -v $(pwd)/server:/app -p 8000:8000 sloth-stream
 
 You can deploy:
 
-- The **server** mounted on Render.com
-- The **client** mounted on render.
+- The **server** mounted on Render.com - https://slothtask-s.onrender.com
+- The **client** mounted on render https://slothtask-c.onrender.com/
 
 ## 🔥 Notes
 

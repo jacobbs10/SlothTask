@@ -7,15 +7,29 @@ RUN apt-get update && apt-get install -y ffmpeg
 # Set working directory
 WORKDIR /app
 
-# Copy everything into the container
-COPY . .
+# Copy package.json files first (for better caching)
+COPY server/package*.json ./server/
 
-# Install dependencies (assumes package.json is in /server)
+# Install server dependencies
 WORKDIR /app/server
 RUN npm install
 
-# Make start script executable
-RUN chmod +x start.sh
+# Copy the rest of the application
+WORKDIR /app
+COPY . .
 
-# Start the app
-CMD ["./start.sh"]
+# Create necessary directories for streams
+RUN mkdir -p ./server/public/streams
+RUN mkdir -p ./server/public/segments
+
+# Ensure video directory exists
+RUN mkdir -p ./server/video
+
+# Expose the port (Render will override with its own PORT env variable)
+EXPOSE 8000
+
+# Set working directory to server for running the app
+WORKDIR /app/server
+
+# Start the server directly
+CMD ["node", "server.js"]

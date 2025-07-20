@@ -3,6 +3,8 @@ import { Play, Pause, Settings, Activity, Users, Clock, Wifi, BarChart2 } from '
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import PerformanceMonitor from './Perf';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 const HLSVideoPlayer = () => {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -27,7 +29,7 @@ const HLSVideoPlayer = () => {
   // Initialize HLS player
   const initializeHLS = async (quality) => {
     try {
-      const response = await fetch(`/api/stream/${quality}`);
+      const response = await fetch(`${API_BASE_URL}/api/stream/${quality}`);
       const data = await response.json();
       
       if (data.success) {
@@ -79,52 +81,101 @@ const HLSVideoPlayer = () => {
 
   // WebSocket connection for real-time performance
   const connectWebSocket = () => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsHost = window.location.hostname;
-    const wsPort = 8080;
-    const wsUrl = `${wsProtocol}://${wsHost}:${wsPort}`;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnectionStatus('connected');
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'performance' && data.perStream) {
-        setPerStreamMetrics(data.perStream);
-        // Optionally, update latency for the current stream
-        if (data.perStream[currentQuality]) {
-          setLatency(data.perStream[currentQuality].latency);
-          setLatencyBoundary(data.perStream[currentQuality].latencyBoundary);
-          setMetrics(data.perStream[currentQuality]);
-          setPerformance(data.perStream[currentQuality]);
+    try {
+      // Ensure API_BASE_URL is properly formatted (no trailing slash)
+      const baseUrl = API_BASE_URL ? API_BASE_URL.replace(/\/$/, '') : '';
+      console.log('Using API base URL:', baseUrl);
+      
+      let wsUrl;
+      if (baseUrl) {
+        // For production with separate deployments
+        const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
+        try {
+          const urlObj = new URL(baseUrl);
+          wsUrl = `${wsProtocol}://${urlObj.host}/ws`; // Add /ws path
+        } catch (e) {
+          console.error('Failed to parse API_BASE_URL:', e);
+          const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+          wsUrl = `${wsProtocol}://${window.location.host}/ws`;
         }
+      } else {
+        // Fallback for development
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        wsUrl = `${wsProtocol}://${window.location.host}/ws`; // Add /ws path
       }
-    };
+      
+      console.log('Connecting to WebSocket at:', wsUrl);
+      
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onclose = () => {
-      setConnectionStatus('disconnected');
-      setTimeout(connectWebSocket, 5000);
-    };
+      ws.onopen = () => {
+        console.log('WebSocket connected successfully');
+        setConnectionStatus('connected');
+        
+        // Send an initial ping message to confirm bidirectional communication
+        ws.send(JSON.stringify({ type: 'ping', client: 'player' }));
+      };
 
-    ws.onerror = () => {
-      setConnectionStatus('error');
-    };
+      ws.onmessage = (event) => {
+        console.log('WebSocket message received:', event.data.slice(0, 100) + '...');
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'performance' && data.perStream) {
+            console.log('Performance data received for streams:', Object.keys(data.perStream));
+            setPerStreamMetrics(data.perStream);
+            // Update current stream metrics
+            if (data.perStream[currentQuality]) {
+              setLatency(data.perStream[currentQuality].latency);
+              setLatencyBoundary(data.perStream[currentQuality].latencyBoundary);
+              setMetrics(data.perStream[currentQuality]);
+              setPerformance(data.perStream[currentQuality]);
+            }
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket connection closed');
+        setConnectionStatus('disconnected');
+        setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionStatus('error');
+      };
+    } catch (error) {
+      console.error('Failed to setup WebSocket:', error);
+    }
   };
 
   // Fetch metrics and performance data
   const fetchMetrics = async () => {
     try {
+      console.log('Fetching metrics from:', `${API_BASE_URL}/api/metrics`);
       const [metricsRes, performanceRes] = await Promise.all([
-        fetch('/api/metrics'),
-        fetch('/api/performance')
+        fetch(`${API_BASE_URL}/api/metrics`),
+        fetch(`${API_BASE_URL}/api/performance`)
       ]);
+      
+      if (!metricsRes.ok) {
+        console.error('Metrics fetch failed:', await metricsRes.text());
+        return;
+      }
+      
+      if (!performanceRes.ok) {
+        console.error('Performance fetch failed:', await performanceRes.text());
+        return;
+      }
       
       const metricsData = await metricsRes.json();
       const performanceData = await performanceRes.json();
+      
+      console.log('Metrics data:', metricsData);
+      console.log('Performance data:', performanceData);
       
       setMetrics(metricsData);
       setPerformance(performanceData);
@@ -148,7 +199,7 @@ const HLSVideoPlayer = () => {
   // Update latency boundary
   const updateLatencyBoundary = async (newBoundary) => {
     try {
-      await fetch('/api/latency-boundary', {
+      await fetch(`${API_BASE_URL}/api/latency-boundary`, { // Add API_BASE_URL here
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ boundary: newBoundary })

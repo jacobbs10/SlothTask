@@ -17,53 +17,16 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ 
   server,
   path: '/ws',
-  // Add WebSocket CORS settings
+  // Simplified WebSocket CORS settings
   verifyClient: (info, cb) => {
-    // Accept connections from any origin in development
-    if (!info.origin) return cb(true);
-    
-    const origin = info.origin;
-    const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
-    // Clean up origins (remove trailing slashes)
-    const cleanOrigin = origin.replace(/\/$/, '');
-    const cleanAllowedOrigin = allowedOrigin.replace(/\/$/, '');
-    
-    console.log(`WebSocket connection request from: ${cleanOrigin}`);
-    
-    if (cleanAllowedOrigin === '*' || cleanOrigin === cleanAllowedOrigin) {
-      cb(true);
-    } else {
-      console.log(`WebSocket connection rejected from ${cleanOrigin}`);
-      cb(false);
-    }
+    // Accept all connections
+    cb(true);
   }
 });
 
-// Middleware
+// Simplified CORS configuration to allow all origins
 const corsOptions = {
-  origin: function(origin, callback) {
-    // For development/testing - allow requests with no origin (like curl)
-    if (!origin) return callback(null, true);
-    
-    // Get allowed origin from environment variable or use the client URL
-    const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
-    // Clean up origins (remove trailing slashes)
-    const cleanOrigin = origin.replace(/\/$/, '');
-    const cleanAllowedOrigin = allowedOrigin.replace(/\/$/, '');
-    
-    // Log for debugging
-    console.log(`CORS request from: ${cleanOrigin}, Allowed: ${cleanAllowedOrigin}`);
-    
-    // Allow the request if the origin matches or if we're allowing all origins
-    if (cleanAllowedOrigin === '*' || cleanOrigin === cleanAllowedOrigin) {
-      callback(null, true);
-    } else {
-      console.log(`CORS blocked for origin: ${cleanOrigin}`);
-      callback(new Error(`Origin ${cleanOrigin} not allowed by CORS policy`));
-    }
-  },
+  origin: '*', // Allow all origins
   credentials: true,
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   optionsSuccessStatus: 204

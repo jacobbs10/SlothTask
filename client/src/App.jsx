@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Settings, Activity, Users, Clock, Wifi } from 'lucide-react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Play, Pause, Settings, Activity, Users, Clock, Wifi, BarChart2 } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import PerformanceMonitor from './Perf';
 
 const HLSVideoPlayer = () => {
@@ -279,10 +279,25 @@ const HLSVideoPlayer = () => {
           flex: 1;
           margin: 0 1rem;
         }
+        
+        .nav-button {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          z-index: 100;
+        }
       `}</style>
 
       <div className="container-fluid py-4" style={{ maxWidth: '72rem' }}>
-        <h1 className="display-5 fw-bold mb-4 text-center">Live HLS Streaming Service</h1>
+        <h1 className="display-5 fw-bold mb-3 text-center">Live HLS Streaming Service</h1>
+        
+        {/* Navigation button centered below headline */}
+        <div className="text-center mb-4">
+          <Link to="/Perf" className="btn btn-primary d-inline-flex align-items-center gap-2">
+            <BarChart2 size={20} />
+            View Performance Dashboard
+          </Link>
+        </div>
         
         {/* Video Player */}
         <div className="bg-black rounded mb-4 video-container">

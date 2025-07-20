@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import { Activity, Users, Clock, Wifi, Server, AlertCircle, TrendingUp, Database } from 'lucide-react';
+import { Activity, Users, Clock, Wifi, Server, AlertCircle, TrendingUp, Database, Video } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const streamLabels = {
   social: 'Social Media (720p)',
@@ -362,11 +363,26 @@ const PerformanceMonitor = () => {
           max-width: 300px;
           margin: 0 auto 2rem auto;
         }
+        
+        .nav-button {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          z-index: 100;
+        }
       `}</style>
 
       <div className="min-vh-100 bg-darker py-4 px-3">
         <div className="container-fluid" style={{ maxWidth: '80rem' }}>
           <h1 className="display-5 fw-bold mb-3 text-center">Performance Monitoring Dashboard</h1>
+          
+          {/* Navigation button centered below headline */}
+          <div className="text-center mb-4">
+            <Link to="/" className="btn btn-primary d-inline-flex align-items-center gap-2">
+              <Video size={20} />
+              Back to Video Player
+            </Link>
+          </div>
           
           {/* Stream selector dropdown */}
           <div className="stream-selector mb-4">

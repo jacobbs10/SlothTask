@@ -1,21 +1,41 @@
 const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-const WebSocket = require('ws');
 const { performance } = require('perf_hooks');
 
 const app = express();
 const port = process.env.PORT || 8000;
 
+// Create HTTP server
+const server = http.createServer(app);
+
+// Setup WebSocket server on the same HTTP server
+const wss = new WebSocket.Server({ 
+  server,
+  path: '/ws',
+  // Add WebSocket CORS settings
+  verifyClient: (info, cb) => {
+    // Accept connections from any origin in development
+    // In production, you can restrict this if needed
+    cb(true);
+  }
+});
+
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static('public'));
-
-// WebSocket server for latency monitoring
-const wss = new WebSocket.Server({ port: 8080 });
 
 // Stream configurations
 const streamConfigs = {
@@ -386,10 +406,35 @@ app.get('/api/performance', (req, res) => {
   });
 });
 
+// Add a health check endpoint for testing connectivity
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    uptime: process.uptime(),
+    wsClients: wss.clients.size
+  });
+});
+
 // WebSocket handling
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  console.log(`New WebSocket connection from ${req.socket.remoteAddress}`);
   streamMetrics.viewerCount++;
-  console.log(`New viewer connected. Total: ${streamMetrics.viewerCount}`);
+  
+  // Send initial data immediately upon connection
+  const memUsage = process.memoryUsage();
+  const cpuUsage = process.cpuUsage();
+  const initialData = {
+    type: 'performance',
+    perStream: { /* Your stream data here */ },
+    timestamp: Date.now()
+  };
+  
+  try {
+    ws.send(JSON.stringify(initialData));
+    console.log('Sent initial performance data to new client');
+  } catch (err) {
+    console.error('Error sending initial data:', err);
+  }
   
   // Send initial latency data for all streams
   Object.keys(streamConfigs).forEach(quality => {
@@ -408,12 +453,21 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
+      console.log('Received WebSocket message:', data);
       if (data.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        ws.send(JSON.stringify({ 
+          type: 'pong', 
+          timestamp: Date.now(),
+          client: data.client || 'unknown'
+        }));
       }
     } catch (err) {
       console.error('WebSocket message error:', err);
     }
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocket client error:', error);
   });
   
   ws.on('close', () => {
@@ -512,7 +566,7 @@ process.on('SIGTERM', () => {
 });
 
 // Start server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`HLS streaming server running on port ${port}`);
   initializeStreams();
 });

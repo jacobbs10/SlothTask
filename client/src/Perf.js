@@ -3,6 +3,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Activity, Users, Clock, Wifi, Server, AlertCircle, TrendingUp, Database, Video } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+// Add API_BASE_URL definition
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 const streamLabels = {
   social: 'Social Media (720p)',
   broadcasting: 'Broadcasting (1080p)',
@@ -49,128 +52,175 @@ const PerformanceMonitor = () => {
 
   // WebSocket for real-time data collection
   useEffect(() => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsHost = window.location.hostname;
-    const wsPort = 8080;
-    const wsUrl = `${wsProtocol}://${wsHost}:${wsPort}`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    try {
+      // Ensure API_BASE_URL is properly formatted (no trailing slash)
+      const baseUrl = API_BASE_URL ? API_BASE_URL.replace(/\/$/, '') : '';
+      console.log('Perf: Using API base URL:', baseUrl);
       
-      if (data.type === 'performance' && data.perStream) {
-        const timestamp = new Date().toLocaleTimeString();
-        
-        // Update history for each stream
-        setPerStreamHistory(prev => {
-          const updated = { ...prev };
-          
-          Object.entries(data.perStream).forEach(([quality, metrics]) => {
-            // Update each metric type for the stream
-            updated[quality] = updated[quality] || {};
-            
-            // Latency
-            updated[quality].latency = [
-              ...((updated[quality].latency || []).slice(-29)), 
-              { 
-                time: timestamp, 
-                value: metrics.latency,
-                boundary: metrics.latencyBoundary 
-              }
-            ];
-            
-            // Throughput
-            updated[quality].throughput = [
-              ...((updated[quality].throughput || []).slice(-29)), 
-              { 
-                time: timestamp, 
-                segments: metrics.segmentsPerSec || 0,
-                mbps: (metrics.segmentsPerSec || 0) * 2 // Estimate mbps based on segments/s
-              }
-            ];
-            
-            // Memory
-            updated[quality].memory = [
-              ...((updated[quality].memory || []).slice(-29)), 
-              { 
-                time: timestamp, 
-                heap: parseFloat(metrics.memory?.heapUsed?.replace(' MB', '') || 0),
-                rss: parseFloat(metrics.memory?.rss?.replace(' MB', '') || 0)
-              }
-            ];
-            
-            // CPU
-            updated[quality].cpu = [
-              ...((updated[quality].cpu || []).slice(-29)), 
-              { 
-                time: timestamp, 
-                usage: Math.random() * 80 + 10, // Using random for CPU
-                cores: navigator.hardwareConcurrency || 4
-              }
-            ];
-            
-            // Viewers - distribute across qualities
-            updated[quality].viewers = [
-              ...((updated[quality].viewers || []).slice(-29)), 
-              { 
-                time: timestamp, 
-                count: metrics.viewers || 0,
-                quality: {
-                  social: quality === 'social' ? (metrics.viewers || 0) : 0,
-                  broadcasting: quality === 'broadcasting' ? (metrics.viewers || 0) : 0,
-                  cinema: quality === 'cinema' ? (metrics.viewers || 0) : 0
-                }
-              }
-            ];
-            
-            // Errors
-            updated[quality].errors = [
-              ...((updated[quality].errors || []).slice(-29)), 
-              { 
-                time: timestamp, 
-                count: Math.floor(Math.random() * 3),
-                severity: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)]
-              }
-            ];
-          });
-          
-          return updated;
-        });
-
-        // Update current stats for the selected stream
-        setCurrentStats(data.perStream[selectedStream] || {});
-        
-        // Generate alerts based on metrics
-        const newAlerts = [];
-        Object.entries(data.perStream).forEach(([quality, metrics]) => {
-          if (metrics.memory?.heapUsed && parseFloat(metrics.memory.heapUsed.replace(' MB', '')) > 500) {
-            newAlerts.push({
-              type: 'warning',
-              message: `High memory usage detected on ${streamLabels[quality]}`,
-              timestamp: new Date().toISOString()
-            });
-          }
-          if (metrics.viewers > 100) {
-            newAlerts.push({
-              type: 'info',
-              message: `High viewer count on ${streamLabels[quality]} - scaling recommended`,
-              timestamp: new Date().toISOString()
-            });
-          }
-          if (metrics.latency > 3000) {
-            newAlerts.push({
-              type: 'warning',
-              message: `High latency detected on ${streamLabels[quality]}`,
-              timestamp: new Date().toISOString()
-            });
-          }
-        });
-        
-        setAlerts(prev => [...prev.slice(-9), ...newAlerts]);
+      let wsUrl;
+      if (baseUrl) {
+        // For production with separate deployments
+        const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
+        try {
+          const urlObj = new URL(baseUrl);
+          wsUrl = `${wsProtocol}://${urlObj.host}/ws`; // Add /ws path
+        } catch (e) {
+          console.error('Perf: Failed to parse API_BASE_URL:', e);
+          const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+          wsUrl = `${wsProtocol}://${window.location.host}/ws`;
+        }
+      } else {
+        // Fallback for development
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        wsUrl = `${wsProtocol}://${window.location.host}/ws`; // Add /ws path
       }
-    };
+      
+      console.log('Perf: Connecting to WebSocket at:', wsUrl);
+      
+      const ws = new WebSocket(wsUrl);
 
-    return () => ws.close();
+      ws.onopen = () => {
+        console.log('Perf: WebSocket connected successfully');
+        
+        // Send an initial ping message to confirm bidirectional communication
+        ws.send(JSON.stringify({ type: 'ping', client: 'dashboard' }));
+      };
+
+      ws.onmessage = (event) => {
+        console.log('Perf: WebSocket message received:', event.data.slice(0, 100) + '...');
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'performance' && data.perStream) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Update history for each stream
+            setPerStreamHistory(prev => {
+              const updated = { ...prev };
+              
+              Object.entries(data.perStream).forEach(([quality, metrics]) => {
+                // Update each metric type for the stream
+                updated[quality] = updated[quality] || {};
+                
+                // Latency
+                updated[quality].latency = [
+                  ...((updated[quality].latency || []).slice(-29)), 
+                  { 
+                    time: timestamp, 
+                    value: metrics.latency,
+                    boundary: metrics.latencyBoundary 
+                  }
+                ];
+                
+                // Throughput
+                updated[quality].throughput = [
+                  ...((updated[quality].throughput || []).slice(-29)), 
+                  { 
+                    time: timestamp, 
+                    segments: metrics.segmentsPerSec || 0,
+                    mbps: (metrics.segmentsPerSec || 0) * 2 // Estimate mbps based on segments/s
+                  }
+                ];
+                
+                // Memory
+                updated[quality].memory = [
+                  ...((updated[quality].memory || []).slice(-29)), 
+                  { 
+                    time: timestamp, 
+                    heap: parseFloat(metrics.memory?.heapUsed?.replace(' MB', '') || 0),
+                    rss: parseFloat(metrics.memory?.rss?.replace(' MB', '') || 0)
+                  }
+                ];
+                
+                // CPU
+                updated[quality].cpu = [
+                  ...((updated[quality].cpu || []).slice(-29)), 
+                  { 
+                    time: timestamp, 
+                    usage: Math.random() * 80 + 10, // Using random for CPU
+                    cores: navigator.hardwareConcurrency || 4
+                  }
+                ];
+                
+                // Viewers - distribute across qualities
+                updated[quality].viewers = [
+                  ...((updated[quality].viewers || []).slice(-29)), 
+                  { 
+                    time: timestamp, 
+                    count: metrics.viewers || 0,
+                    quality: {
+                      social: quality === 'social' ? (metrics.viewers || 0) : 0,
+                      broadcasting: quality === 'broadcasting' ? (metrics.viewers || 0) : 0,
+                      cinema: quality === 'cinema' ? (metrics.viewers || 0) : 0
+                    }
+                  }
+                ];
+                
+                // Errors
+                updated[quality].errors = [
+                  ...((updated[quality].errors || []).slice(-29)), 
+                  { 
+                    time: timestamp, 
+                    count: Math.floor(Math.random() * 3),
+                    severity: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)]
+                  }
+                ];
+              });
+              
+              return updated;
+            });
+
+            // Update current stats for the selected stream
+            setCurrentStats(data.perStream[selectedStream] || {});
+            
+            // Generate alerts based on metrics
+            const newAlerts = [];
+            Object.entries(data.perStream).forEach(([quality, metrics]) => {
+              if (metrics.memory?.heapUsed && parseFloat(metrics.memory.heapUsed.replace(' MB', '')) > 500) {
+                newAlerts.push({
+                  type: 'warning',
+                  message: `High memory usage detected on ${streamLabels[quality]}`,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              if (metrics.viewers > 100) {
+                newAlerts.push({
+                  type: 'info',
+                  message: `High viewer count on ${streamLabels[quality]} - scaling recommended`,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              if (metrics.latency > 3000) {
+                newAlerts.push({
+                  type: 'warning',
+                  message: `High latency detected on ${streamLabels[quality]}`,
+                  timestamp: new Date().toISOString()
+                });
+              }
+            });
+            
+            setAlerts(prev => [...prev.slice(-9), ...newAlerts]);
+          }
+        } catch (err) {
+          console.error('Perf: Error parsing WebSocket message:', err);
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log('Perf: WebSocket connection closed:', event);
+      };
+
+      ws.onerror = (error) => {
+        console.error('Perf: WebSocket error:', error);
+      };
+
+      return () => {
+        ws.close();
+        console.log('Perf: WebSocket connection closed');
+      };
+    } catch (error) {
+      console.error('Perf: WebSocket setup error:', error);
+    }
   }, []);
 
   // Update current stats when selected stream changes
@@ -178,7 +228,7 @@ const PerformanceMonitor = () => {
     // Fetch the current stats for the selected stream
     const fetchStreamStats = async () => {
       try {
-        const response = await fetch(`/api/metrics`);
+        const response = await fetch(`${API_BASE_URL}/api/metrics`); // Add API_BASE_URL here
         const data = await response.json();
         if (data.perStream && data.perStream[selectedStream]) {
           setCurrentStats(data.perStream[selectedStream]);

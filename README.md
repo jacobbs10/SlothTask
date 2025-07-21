@@ -1,118 +1,160 @@
-# 🦥 Sloth Live HLS Stream with Latency Measurement
+# 🦥 SlothTask: Live HLS Streaming with Real-Time Latency and Performance Monitoring
 
-This project sets up a live-looping HLS video stream of a sloth using H.265 (HEVC) encoding and visualizes the latency between the server and the client playback. Built with Node.js, FFmpeg, and a React frontend.
+This project creates a live-looping HLS video stream (HEVC/H.265) and provides a modern React dashboard to visualize playback latency and real-time stream performance metrics. The stack features a Node.js/Express server, FFmpeg for video processing, and a sophisticated React frontend with charts and analytics.
+
+---
 
 ## 📁 Project Structure
 
 ```
-sloth-streaming-project/
+SlothTask/
 │
 ├── server/
-│   ├── server.js             # Express server serving HLS stream with CORS headers
-│   ├── ffmpeg-loop.sh        # Shell script looping MP4 as live HLS stream
-│   ├── hls/                  # Folder for output HLS segments
+│   ├── server.js            # Express server for HLS, API, WebSocket, CORS, and static assets
+│   ├── public/
+│   │   ├── streams/         # Directory for output HLS segment playlists (.m3u8, .ts)
+│   │   └── segments/        # (If used) Additional segment storage
 │   ├── video/
-│       └── Sloths.mp4         # Video file (should be mounted in Docker)
+│   │   └── Sloths.mp4       # Source video file (mount or provide)
 │
 ├── client/
 │   ├── public/
 │   └── src/
-│       ├── App.js            # React component to play video & show latency
-│       └── index.js
+│       ├── App.jsx          # Main React SPA: video player, latency, metrics, controls
+│       ├── Perf.js          # Performance dashboard: charts, recommendations, score
+│       └── index.js         # App entry
 │
-└── Dockerfile               # For running the server containerized
+├── dev.js                   # Development launcher for client/server
+├── Dockerfile               # Multi-service Docker build (server + client + ffmpeg)
+├── README.md
 ```
-
-## 🛠️ Requirements
-
-- Node.js + npm
-- FFmpeg (must be installed locally)
-- Docker (for bonus packaging)
-- React (create via `npx create-react-app client`)
-
-## 🚀 Instructions
-
-### 1. Install FFmpeg
-
-Install FFmpeg locally (required for the stream).
-
-- macOS: `brew install ffmpeg`
-- Ubuntu: `sudo apt install ffmpeg`
-- Windows: Use Git Bash and [download FFmpeg](https://ffmpeg.org/download.html), and add it to your PATH.
-
-### 2. Server Setup
-
-```
-cd server
-npm install
-npm install express
-npm install cors
-chmod +x ffmpeg-loop.sh
-./ffmpeg-loop.sh & node server.js
-```
-
-> This will start generating HLS segments into `/hls` and serve them on `http://localhost:8000/hls/stream.m3u8`.
-
-### 3. React Client
-
-Create a React app (if not already):
-
-```
-npx create-react-app client
-cd client
-npm install hls.js
-```
-
-React App:
-
-- Plays the HLS stream
-- Fetches server time every second and compares with `video.currentTime` to estimate latency
-
-Run the React app:
-
-```
-npm start
-```
-
-The video will play and the **latency in seconds** will be displayed under it.
-
-### 4. Docker Bonus
-
-To build and run the server in a container:
-
-```
-docker build -t sloth-stream .
-docker run -v $(pwd)/server:/app -p 8000:8000 sloth-stream
-```
-
-### 5. Deployment Bonus
-
-You can deploy:
-
-- The **server** mounted on Render.com - https://slothtask-s.onrender.com
-- The **client** mounted on render https://slothtask-c.onrender.com/
-
-## 🔥 Notes
-
-- The stream uses HLS v1 with H.265 codec (`libx265`). Your browser **must support H.265**, or use a compatible device (e.g., Safari on Mac).
-- Due to CORS, the server sets `Access-Control-Allow-Origin: *`.
-
-## 🧾 .gitignore Tip
-
-To avoid committing large media files:
-
-```
-*.mp4
-server/hls/*
-```
-
-## 🐞 Troubleshooting
-
-- **Video not loading (CORS)**: Make sure Express server adds CORS headers.
-- **FFmpeg error `Stream HEVC is not hvc1`**: Add `-tag:v hvc1` to ffmpeg command.
-- **Windows issues**: Run using Git Bash or WSL. Use `bash ffmpeg-loop.sh & node server.js`.
 
 ---
 
-Enjoy watching the world’s laziest live stream in real time!# SlothTask
-Sloth task for webiks
+## 🛠️ Requirements
+
+- Node.js (v18+) & npm
+- FFmpeg (locally for development, installed in Docker for prod)
+- Docker (optional, for all-in-one build)
+- React (already bootstrapped in `/client`)
+- (Optional) [hls.js](https://github.com/video-dev/hls.js) for client-side playback
+
+---
+
+## 🚀 Setup & Usage
+
+### 1. Install FFmpeg
+
+- **macOS:** `brew install ffmpeg`
+- **Ubuntu:** `sudo apt install ffmpeg`
+- **Windows:** Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
+
+### 2. Install Dependencies
+
+#### Server
+
+```bash
+cd server
+npm install
+```
+
+#### Client
+
+```bash
+cd ../client
+npm install
+```
+
+### 3. Add Source Video
+
+Place your video file at `server/video/Sloths.mp4` (or use the default if running via Docker).
+
+### 4. Start the Services
+
+#### Development (with live reload):
+
+```bash
+# From repo root
+node dev.js
+```
+- Starts the server (`server/server.js`) on port 8000.
+- Starts React client (`client/src/App.jsx`) on port 3000.
+
+#### Production:
+
+```bash
+cd server
+npm run build
+node server.js
+```
+
+### 5. Access the App
+
+- **Frontend:** http://localhost:3000
+- **Backend (API, HLS):** http://localhost:8000
+- **HLS Playlist Example:** http://localhost:8000/streams/broadcasting/playlist.m3u8
+
+---
+
+## 🖥️ Features
+
+- **Multi-quality HLS Streaming:** (720p/1080p/4K) with network-aware codec selection.
+- **HEVC Support:** Uses H.265 encoding (browser/device support required).
+- **Live Latency Measurement:** Client fetches server time, compares with video playback, and displays exact latency in real time.
+- **Performance Dashboard:** 
+  - Real-time charts for latency, memory, CPU, throughput, and viewer distribution.
+  - Performance score and recommendations.
+  - Viewer/stream statistics and uptime.
+- **WebSocket Metrics:** All performance/metrics data is pushed live to the frontend via WebSocket.
+- **CORS:** Server is CORS-enabled for client connections.
+- **Dockerfile:** All-in-one build for production (installs deps, builds client, runs server, prepares video).
+
+---
+
+## 🐳 Docker Usage
+
+Build and run the full stack in one container:
+
+```bash
+docker build -t slothtask .
+docker run -p 8000:8000 slothtask
+# By default, React is served statically on :8000, HLS on :8000/streams/
+```
+- To use your own video: `-v $(pwd)/server/video:/app/server/video`
+
+---
+
+## ☁️ Deployment
+
+- **Server:** Can be deployed to Render.com, AWS, or any Node.js-capable host.
+- **Client:** Serves statically from the same Express server in production.
+
+Demo URLs (if available):
+- Server: https://slothtask-s.onrender.com
+- Client: https://slothtask-c.onrender.com
+
+---
+
+## 🧾 .gitignore
+
+Recommended to ignore large/video files and generated HLS segments:
+
+```
+*.mp4
+server/public/streams/*
+server/public/segments/*
+```
+
+---
+
+## 🐞 Troubleshooting
+
+- **Video Not Loading:** Ensure browser supports H.265/HEVC (Safari is recommended). For Chrome/Firefox, use a compatible plugin or hardware.
+- **CORS Errors:** The server sets `Access-Control-Allow-Origin: *` by default, but can be restricted for production.
+- **FFmpeg Not Found:** Ensure it’s in your `$PATH` or use Docker build.
+- **Windows Users:** Use Git Bash or WSL for shell scripts and Docker.
+- **No video at `server/video/Sloths.mp4`:** Add your own file or let Docker auto-generate a sample.
+
+---
+
+## ✨ Enjoy watching the world’s laziest live stream with full analytics!

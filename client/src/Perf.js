@@ -4,7 +4,9 @@ import { Activity, Users, Clock, Wifi, Server, AlertCircle, TrendingUp, Database
 import { Link } from 'react-router-dom';
 
 // Add API_BASE_URL definition
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? '' // Empty for single-service deployment
+  : 'http://localhost:8000'; // Explicit URL for local development
 
 const streamLabels = {
   social: 'Social Media (720p)',
@@ -228,8 +230,17 @@ const PerformanceMonitor = () => {
     // Fetch the current stats for the selected stream
     const fetchStreamStats = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/metrics`); // Add API_BASE_URL here
+        console.log('Fetching stream stats from:', `${API_BASE_URL}/api/metrics`);
+        const response = await fetch(`${API_BASE_URL}/api/metrics`);
+        
+        if (!response.ok) {
+          console.error('Stream stats fetch failed:', await response.text());
+          return;
+        }
+        
         const data = await response.json();
+        console.log('Stream stats data:', data);
+        
         if (data.perStream && data.perStream[selectedStream]) {
           setCurrentStats(data.perStream[selectedStream]);
         }

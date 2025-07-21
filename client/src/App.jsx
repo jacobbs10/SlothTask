@@ -3,7 +3,11 @@ import { Play, Pause, Settings, Activity, Users, Clock, Wifi, BarChart2 } from '
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import PerformanceMonitor from './Perf';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// In a single service deployment, API_BASE_URL should be empty
+// For local development, the proxy in package.json handles routing
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? '' // Empty for single-service deployment
+  : 'http://localhost:8000'; // Explicit URL for local development
 
 const HLSVideoPlayer = () => {
   const videoRef = useRef(null);
@@ -29,7 +33,7 @@ const HLSVideoPlayer = () => {
   // Initialize HLS player
   const initializeHLS = async (quality) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/stream/${quality}`);
+      const response = await fetch(`/api/stream/${quality}`);
       const data = await response.json();
       
       if (data.success) {
@@ -82,27 +86,11 @@ const HLSVideoPlayer = () => {
   // WebSocket connection for real-time performance
   const connectWebSocket = () => {
     try {
-      // Ensure API_BASE_URL is properly formatted (no trailing slash)
-      const baseUrl = API_BASE_URL ? API_BASE_URL.replace(/\/$/, '') : '';
-      console.log('Using API base URL:', baseUrl);
-      
-      let wsUrl;
-      if (baseUrl) {
-        // For production with separate deployments
-        const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-        try {
-          const urlObj = new URL(baseUrl);
-          wsUrl = `${wsProtocol}://${urlObj.host}/ws`; // Add /ws path
-        } catch (e) {
-          console.error('Failed to parse API_BASE_URL:', e);
-          const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-          wsUrl = `${wsProtocol}://${window.location.host}/ws`;
-        }
-      } else {
-        // Fallback for development
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        wsUrl = `${wsProtocol}://${window.location.host}/ws`; // Add /ws path
-      }
+      // Create WebSocket URL based on environment
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = process.env.NODE_ENV === 'production'
+        ? `${wsProtocol}://${window.location.host}/ws`
+        : `ws://localhost:8000/ws`;
       
       console.log('Connecting to WebSocket at:', wsUrl);
       
@@ -199,7 +187,7 @@ const HLSVideoPlayer = () => {
   // Update latency boundary
   const updateLatencyBoundary = async (newBoundary) => {
     try {
-      await fetch(`${API_BASE_URL}/api/latency-boundary`, { // Add API_BASE_URL here
+      await fetch('/api/latency-boundary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ boundary: newBoundary })

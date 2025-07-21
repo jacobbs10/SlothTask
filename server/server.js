@@ -24,9 +24,35 @@ const wss = new WebSocket.Server({
   }
 });
 
-// Simplified CORS configuration to allow all origins
+// Update the CORS configuration to work in both environments
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+// CORS configuration that works for both development and production
 const corsOptions = {
-  origin: '*', // Allow all origins
+  origin: function(origin, callback) {
+    // In development or for requests with no origin (like curl)
+    if (isDevelopment || !origin) {
+      return callback(null, true);
+    }
+    
+    // In production, allow same origin and the frontend URL if specified
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || '',
+      process.env.RENDER_EXTERNAL_URL || ''
+    ].filter(Boolean);
+    
+    // If no specific origins configured, allow all
+    if (allowedOrigins.length === 0) {
+      return callback(null, true);
+    }
+    
+    // Check if the origin is allowed
+    if (allowedOrigins.some(allowed => origin.indexOf(allowed) !== -1)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for now (change to false for stricter security)
+    }
+  },
   credentials: true,
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   optionsSuccessStatus: 204
@@ -36,6 +62,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Stream configurations
 const streamConfigs = {
@@ -563,6 +590,20 @@ process.on('SIGTERM', () => {
   });
   
   process.exit(0);
+});
+
+// Replace the current catch-all route with this one
+// Make sure this is the last route handler
+app.use((req, res, next) => {
+  // Skip API and stream routes
+  if (req.path.startsWith('/api/') || 
+      req.path.startsWith('/streams/') || 
+      req.path.startsWith('/ws')) {
+    return next();
+  }
+  
+  // Send React app for all other routes
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 // Start server

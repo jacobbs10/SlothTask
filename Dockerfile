@@ -39,7 +39,7 @@ RUN mkdir -p ./video
 
 # Create a default video file if none exists (using ffmpeg)
 RUN if [ ! -f ./video/Sloths.mp4 ]; then \
-      ffmpeg -f lavfi -i color=c=blue:s=1280x720:d=60 -t 60 ./video/Sloths.mp4; \
+      ffmpeg -f lavfi -i color=c=blue:s=640x360:d=60 -c:v libx264 -preset ultrafast -t 60 ./video/Sloths.mp4; \
     fi
 
 # Expose the port (Render will override with its own PORT env variable)
@@ -47,6 +47,9 @@ EXPOSE 8000
 
 # Set working directory to server for running the app
 WORKDIR /app/server
+
+# Increase memory limit for Node.js
+ENV NODE_OPTIONS="--max-old-space-size=512"
 
 # Start the server
 CMD ["node", "server.js"]
